@@ -269,9 +269,9 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_ct_default_secondary \"\";mp_free_armor 1;mp_freezetime 10;mp_give_player_c4 0;mp_maxmoney 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_t_default_secondary \"\";mp_round_restart_delay 3;mp_team_intro_time 0;mp_restartgame 1;mp_warmup_end;");
             }
 
-            PrintToAllChat($"{ChatColors.Olive}URA URA!");
-            PrintToAllChat($"{ChatColors.Lime}URA URA!");
-            PrintToAllChat($"{ChatColors.Green}URA URA!");
+            PrintToAllChat($"{ChatColors.Olive}1!");
+            PrintToAllChat($"{ChatColors.Lime}2!");
+            PrintToAllChat($"{ChatColors.Green}36!");
         }
 
         private void SendSideSelectionMessage()
@@ -328,9 +328,9 @@ namespace MatchZy
             // This is to reload the map once it is over so that all flags are reset accordingly
             Server.ExecuteCommand("mp_match_end_restart true");
 
-            PrintToAllChat($"{ChatColors.Olive}1.2!");
-            PrintToAllChat($"{ChatColors.Lime}2.3!");
-            PrintToAllChat($"{ChatColors.Green}3.6!");
+            PrintToAllChat($"{ChatColors.Olive}BẮT ĐẦU!");
+            PrintToAllChat($"{ChatColors.Olive}BẮT ĐẦU!");
+            PrintToAllChat($"{ChatColors.Olive}BẮT ĐẦU!");
 
             var goingLiveEvent = new GoingLiveEvent
             {
@@ -854,7 +854,7 @@ namespace MatchZy
                 return;
             }
 
-            string cleanTeamName = RemoveSpecialCharacters(teamName.Replace(" ", "_"));
+            string cleanTeamName = teamName.Trim();
 
             if (cleanTeamName.Length > 20)
             {
@@ -914,7 +914,7 @@ namespace MatchZy
 
         [ConsoleCommand("css_name", "Set team name")]
         [ConsoleCommand("css_n", "Set team name (short)")]
-        [CommandHelper(minArgs: 1, usage: "[team name]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+        [CommandHelper(minArgs: 0, usage: "[team name]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
         public void OnNameCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player == null || !player.IsValid) return;
@@ -925,32 +925,17 @@ namespace MatchZy
                 return;
             }
 
-            string teamName = command.GetArg(1);
+            List<string> args = new List<string>();
+            for (int i = 1; i < command.ArgCount; i++)
+            {
+                args.Add(command.GetArg(i));
+            }
+
+            string teamName = string.Join(" ", args);
             SetTeamName(player, teamName);
         }
 
-        [ConsoleCommand("css_say", "Handle chat messages")]
-        public void OnSayCommand(CCSPlayerController? player, CommandInfo command)
-        {
-            if (player == null || !player.IsValid) return;
-
-            string message = command.GetArg(1);
-
-            if (message.StartsWith(".name ") || message.StartsWith(".n "))
-            {
-                if (!isWaitingForTeamNames)
-                {
-                    PrintToPlayerChat(player, Localizer["matchzy.teams.error.onlywhenrequired"]);
-                    return;
-                }
-
-                string teamName = message.StartsWith(".name ") ? message[6..] : message[3..];
-                SetTeamName(player, teamName);
-            }
-        }
-
         // CODE END
-
         public void HandleClanTags()
         {
             return;
