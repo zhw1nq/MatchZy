@@ -38,7 +38,6 @@
   "matchzy.cc.globalnades": "Lưu/Tải Lineup toàn cầu hiện tại là {0}!",
   "matchzy.cc.wl": "Whitelist hiện tại là {0}!",
   "matchzy.cc.playout": "Playout hiện tại là {0}!",
-  "matchzy.cc.rcon": "Lệnh đã gửi thành công!",
   "matchzy.cc.exitprac": "MatchZy hiện đang ở chế độ thi đấu!",
   "matchzy.cc.match": "MatchZy hiện đang ở chế độ thi đấu!",
   "matchzy.cc.startisprac": "Không thể bắt đầu trận đấu khi đang ở chế độ luyện tập. Vui lòng dùng lệnh .exitprac để thoát trước!",
@@ -122,7 +121,6 @@
   "matchzy.pracc.decoy": "Decoy do {red}{0}{silver} ném mất {green}{1}{silver}s để phát nổ",
   "matchzy.pracc.damage": "{red}{0}{silver} gây {silver} sát thương cho {lightblue}{1}{silver}({green}{2}{silver} máu)",
   "matchzy.pracc.blind": "{lightblue}{0}{silver} bị flash mù trong {green}{1}{silver}s",
-
   "matchzy.teams.setnames": "{red}Các đội phải đặt tên trước khi trận đấu có thể bắt đầu!",
   "matchzy.teams.setnames.usage": "Dùng {green}!name <tên_đội>{silver} hoặc {green}!n <tên_đội>{silver} để đặt tên cho đội của bạn",
   "matchzy.teams.setnames.reminder": "{red}Nhắc nhở: Các đội phải đặt tên!",
