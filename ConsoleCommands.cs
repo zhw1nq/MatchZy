@@ -653,9 +653,6 @@ namespace MatchZy
                 return;
             }
             Server.ExecuteCommand(command.ArgString);
-            // ReplyToUserCommand(player, "Command sent successfully!");
-            ReplyToUserCommand(player, Localizer["matchzy.cc.rcon"]);
-
         }
 
         [ConsoleCommand("css_help", "Triggers provided command on the server")]
