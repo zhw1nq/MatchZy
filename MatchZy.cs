@@ -14,7 +14,7 @@ namespace MatchZy
 
         public override string ModuleName => "MatchZy";
 
-        public override string ModuleVersion => "3.1.2";
+        public override string ModuleVersion => "0.8.14";
 
         public override string ModuleAuthor => "WD- (https://github.com/shobhit-pathak/)";
 
@@ -200,7 +200,9 @@ namespace MatchZy
                 { ".bestctspawn", OnBestCTSpawnCommand },
                 { ".worstctspawn", OnWorstCTSpawnCommand },
                 { ".besttspawn", OnBestTSpawnCommand },
-                { ".worsttspawn", OnWorstTSpawnCommand }
+                { ".worsttspawn", OnWorstTSpawnCommand },
+                { ".savepos", OnSavePosCommand},
+                { ".loadpos", OnLoadPosCommand}
             };
 
             RegisterEventHandler<EventPlayerConnectFull>(EventPlayerConnectFullHandler);
@@ -260,6 +262,8 @@ namespace MatchZy
                 }
                 return HookResult.Continue;
             });
+
+            AddCommandListener("noclip", OnConsoleNoClip); // Override noclip
 
             RegisterEventHandler<EventRoundEnd>((@event, info) => 
             {
