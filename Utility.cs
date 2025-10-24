@@ -2,6 +2,8 @@ using System.Text.Json;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Core.Attributes;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Timers;
@@ -11,7 +13,9 @@ using System.Text.RegularExpressions;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using System.Drawing;
-
+using Microsoft.Extensions.Localization;
+using CounterStrikeSharp.API.Modules.Entities;
+using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 
 namespace MatchZy
 {
@@ -265,9 +269,9 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_ct_default_secondary \"\";mp_free_armor 1;mp_freezetime 10;mp_give_player_c4 0;mp_maxmoney 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_t_default_secondary \"\";mp_round_restart_delay 3;mp_team_intro_time 0;mp_restartgame 1;mp_warmup_end;");
             }
 
-            PrintToAllChat($"{ChatColors.Olive}KNIFE!");
-            PrintToAllChat($"{ChatColors.Lime}KNIFE!");
-            PrintToAllChat($"{ChatColors.Green}KNIFE!");
+            PrintToAllChat($"{ChatColors.Olive}1!");
+            PrintToAllChat($"{ChatColors.Lime}2!");
+            PrintToAllChat($"{ChatColors.Green}36!");
         }
 
         private void SendSideSelectionMessage()
@@ -324,9 +328,9 @@ namespace MatchZy
             // This is to reload the map once it is over so that all flags are reset accordingly
             Server.ExecuteCommand("mp_match_end_restart true");
 
-            PrintToAllChat($"{ChatColors.Olive}LIVE!");
-            PrintToAllChat($"{ChatColors.Lime}LIVE!");
-            PrintToAllChat($"{ChatColors.Green}LIVE!");
+            PrintToAllChat($"{ChatColors.Olive}BẮT ĐẦU!");
+            PrintToAllChat($"{ChatColors.Olive}BẮT ĐẦU!");
+            PrintToAllChat($"{ChatColors.Olive}BẮT ĐẦU!");
 
             var goingLiveEvent = new GoingLiveEvent
             {
@@ -711,10 +715,18 @@ namespace MatchZy
             }
         }
 
+        // CODE START
+
+        private bool isTeam1NameSet = false;
+        private bool isTeam2NameSet = false;
+        private bool isWaitingForTeamNames = false;
+        private Timer? teamNameReminderTimer;
+
         private void HandleMatchStart()
         {
             isPractice = false;
             isDryRun = false;
+
             if (isRoundRestorePending)
             {
                 RestoreRoundBackup(null, pendingRestoreFileName);
@@ -722,49 +734,50 @@ namespace MatchZy
                 pendingRestoreFileName = "";
                 return;
             }
-            // If default names, we pick a player and use their name as their team name
-            if (matchzyTeam1.teamName == "COUNTER-TERRORISTS")
+
+            if (matchzyTeam1.teamName == "COUNTER-TERRORISTS" || matchzyTeam2.teamName == "TERRORISTS")
             {
-                // matchzyTeam1.teamName = teamName;
+                if (!isWaitingForTeamNames)
+                {
+                    matchStarted = true;
+                    isWaitingForTeamNames = true;
+                    isTeam1NameSet = matchzyTeam1.teamName != "COUNTER-TERRORISTS";
+                    isTeam2NameSet = matchzyTeam2.teamName != "TERRORISTS";
+
+                    PrintToAllChat(Localizer["matchzy.teams.setnames"]);
+                    PrintToAllChat(Localizer["matchzy.teams.setnames.usage"]);
+
+                    if (!isTeam1NameSet)
+                    {
+                        PrintToAllChat(Localizer["matchzy.teams.ct.needsname"]);
+                    }
+                    if (!isTeam2NameSet)
+                    {
+                        PrintToAllChat(Localizer["matchzy.teams.t.needsname"]);
+                    }
+
+                    StartTeamNameReminder();
+                }
+                return;
+            }
+
+            isWaitingForTeamNames = false;
+            StopTeamNameReminder();
+
+            if (matchzyTeam1.teamName != "COUNTER-TERRORISTS")
+            {
                 teamSides[matchzyTeam1] = "CT";
                 reverseTeamSides["CT"] = matchzyTeam1;
-                foreach (var key in playerData.Keys)
-                {
-                    if (playerData[key].TeamNum == 3)
-                    {
-                        matchzyTeam1.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_"));
-                        foreach (var coach in matchzyTeam1.coach) {
-                            coach.Clan = $"[{matchzyTeam1.teamName} COACH]";
-                        }
-                        break;
-                    }
-                }
-                // Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
             }
 
-            if (matchzyTeam2.teamName == "TERRORISTS")
+            if (matchzyTeam2.teamName != "TERRORISTS")
             {
-                // matchzyTeam2.teamName = teamName;
                 teamSides[matchzyTeam2] = "TERRORIST";
                 reverseTeamSides["TERRORIST"] = matchzyTeam2;
-                foreach (var key in playerData.Keys)
-                {
-                    if (playerData[key].TeamNum == 2)
-                    {
-                        matchzyTeam2.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_"));
-                        foreach (var coach in matchzyTeam2.coach) {
-                            coach.Clan = $"[{matchzyTeam2.teamName} COACH]";
-                        }
-                        break;
-                    }
-                }
-                // Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
             }
 
-            Server.ExecuteCommand($"mp_teamname_1 {reverseTeamSides["CT"].teamName}");
-            Server.ExecuteCommand($"mp_teamname_2 {reverseTeamSides["TERRORIST"].teamName}");
-
-            HandleClanTags();
+            Server.ExecuteCommand($"mp_teamname_1 \"{reverseTeamSides["CT"].teamName}\"");
+            Server.ExecuteCommand($"mp_teamname_2 \"{reverseTeamSides["TERRORIST"].teamName}\"");
 
             string seriesType = "BO" + matchConfig.NumMaps.ToString();
             liveMatchId = database.InitMatch(matchzyTeam1.teamName, matchzyTeam2.teamName, "-", isMatchSetup, liveMatchId, matchConfig.CurrentMapNumber, seriesType, matchConfig);
@@ -785,10 +798,12 @@ namespace MatchZy
                 StartDemoRecording();
                 StartLive();
             }
+
             if (showCreditsOnMatchStart.Value)
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}MatchZy{ChatColors.Default} Plugin by {ChatColors.Green}WD-{ChatColors.Default}");
+                PrintToAllChat(Localizer["matchzy.credits"]);
             }
+
             if (matchStartMessage.Value.Trim() != "" && matchStartMessage.Value.Trim() != "\"\"")
             {
                 List<string> matchStartMessages = [.. matchStartMessage.Value.Split("$$$")];
@@ -799,42 +814,130 @@ namespace MatchZy
             }
         }
 
+        private void StartTeamNameReminder()
+        {
+            StopTeamNameReminder();
+            teamNameReminderTimer = AddTimer(7.0f, () =>
+            {
+                if (isWaitingForTeamNames && (!isTeam1NameSet || !isTeam2NameSet))
+                {
+                    PrintToAllChat(Localizer["matchzy.teams.setnames.reminder"]);
+                    PrintToAllChat(Localizer["matchzy.teams.setnames.usage"]);
+
+                    if (!isTeam1NameSet)
+                    {
+                        PrintToAllChat(Localizer["matchzy.teams.ct.needsname"]);
+                    }
+                    if (!isTeam2NameSet)
+                    {
+                        PrintToAllChat(Localizer["matchzy.teams.t.needsname"]);
+                    }
+                }
+            }, TimerFlags.REPEAT);
+        }
+
+        private void StopTeamNameReminder()
+        {
+            if (teamNameReminderTimer != null)
+            {
+                teamNameReminderTimer.Kill();
+                teamNameReminderTimer = null;
+            }
+        }
+
+        public void SetTeamName(CCSPlayerController player, string teamName)
+        {
+            if (string.IsNullOrWhiteSpace(teamName))
+            {
+                PrintToPlayerChat(player, Localizer["matchzy.teams.error.providename"]);
+                return;
+            }
+
+            string cleanTeamName = teamName.Trim();
+
+            if (cleanTeamName.Length > 20)
+            {
+                PrintToPlayerChat(player, Localizer["matchzy.teams.error.toolong"]);
+                return;
+            }
+
+            if (player.TeamNum == 3)
+            {
+                if (isTeam1NameSet)
+                {
+                    PrintToPlayerChat(player, Localizer["matchzy.teams.error.ct.alreadyset"]);
+                    return;
+                }
+
+                matchzyTeam1.teamName = cleanTeamName;
+                isTeam1NameSet = true;
+                PrintToAllChat(Localizer["matchzy.teams.ct.nameset", cleanTeamName]);
+            }
+            else if (player.TeamNum == 2)
+            {
+                if (isTeam2NameSet)
+                {
+                    PrintToPlayerChat(player, Localizer["matchzy.teams.error.t.alreadyset"]);
+                    return;
+                }
+
+                matchzyTeam2.teamName = cleanTeamName;
+                isTeam2NameSet = true;
+                PrintToAllChat(Localizer["matchzy.teams.t.nameset", cleanTeamName]);
+            }
+            else
+            {
+                PrintToPlayerChat(player, Localizer["matchzy.teams.error.mustbeonteam"]);
+                return;
+            }
+
+            if (isTeam1NameSet && isTeam2NameSet)
+            {
+                PrintToAllChat(Localizer["matchzy.teams.bothnames.set"]);
+                StopTeamNameReminder();
+
+                HandleMatchStart();
+            }
+            else
+            {
+                if (!isTeam1NameSet)
+                {
+                    PrintToAllChat(Localizer["matchzy.teams.ct.waiting"]);
+                }
+                if (!isTeam2NameSet)
+                {
+                    PrintToAllChat(Localizer["matchzy.teams.t.waiting"]);
+                }
+            }
+        }
+
+        [ConsoleCommand("css_name", "Set team name")]
+        [ConsoleCommand("css_n", "Set team name (short)")]
+        [CommandHelper(minArgs: 0, usage: "[team name]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+        public void OnNameCommand(CCSPlayerController? player, CommandInfo command)
+        {
+            if (player == null || !player.IsValid) return;
+
+            if (!isWaitingForTeamNames)
+            {
+                PrintToPlayerChat(player, Localizer["matchzy.teams.error.onlywhenrequired"]);
+                return;
+            }
+
+            List<string> args = new List<string>();
+            for (int i = 1; i < command.ArgCount; i++)
+            {
+                args.Add(command.GetArg(i));
+            }
+
+            string teamName = string.Join(" ", args);
+            SetTeamName(player, teamName);
+        }
+
+        // CODE END
         public void HandleClanTags()
         {
-            // Currently it is not possible to keep updating player tags while in warmup without restarting the match
-            // Hence returning from here until we find a proper solution
             return;
-
-            if (readyAvailable && !matchStarted)
-            {
-                foreach (var key in playerData.Keys)
-                {
-                    if (playerReadyStatus[key])
-                    {
-                        playerData[key].Clan = "[Ready]";
-                    }
-                    else
-                    {
-                        playerData[key].Clan = "[Unready]";
-                    }
-                    Server.PrintToChatAll($"PlayerName: {playerData[key].PlayerName} Clan: {playerData[key].Clan}");
-                }
-            }
-            else if (matchStarted)
-            {
-                foreach (var key in playerData.Keys)
-                {
-                    if (playerData[key].TeamNum == 2)
-                    {
-                        playerData[key].Clan = reverseTeamSides["TERRORIST"].teamTag;
-                    }
-                    else if (playerData[key].TeamNum == 3)
-                    {
-                        playerData[key].Clan = reverseTeamSides["CT"].teamTag;
-                    }
-                    Server.PrintToChatAll($"PlayerName: {playerData[key].PlayerName} Clan: {playerData[key].Clan}");
-                }
-            }
         }
 
         private void HandleMatchEnd()
@@ -1175,7 +1278,7 @@ namespace MatchZy
                 PrintToPlayerChat(player, Localizer["matchzy.pause.techpausenotenabled"]);
                 return;
             }
-            if(!string.IsNullOrEmpty(techPausePermission.Value) && techPausePermission.Value != "\"\"")
+            if (!string.IsNullOrEmpty(techPausePermission.Value) && techPausePermission.Value != "\"\"")
             {
                 if (!IsPlayerAdmin(player, "css_pause", techPausePermission.Value))
                 {
@@ -2043,7 +2146,7 @@ namespace MatchZy
             foreach (var player in players)
             {
                 if (!IsPlayerValid(player)) continue;
-                
+
                 if (teamSpawns[player.TeamNum].Count == 0) break;
 
                 int randomIndex = random.Next(teamSpawns[player.TeamNum].Count);

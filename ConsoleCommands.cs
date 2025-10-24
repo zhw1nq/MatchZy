@@ -654,7 +654,7 @@ namespace MatchZy
             }
             Server.ExecuteCommand(command.ArgString);
             // ReplyToUserCommand(player, "Command sent successfully!");
-            ReplyToUserCommand(player, Localizer["matchzy.cc.rcon"]);
+            // ReplyToUserCommand(player, Localizer["matchzy.cc.rcon"]);
 
         }
 
