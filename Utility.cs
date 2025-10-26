@@ -146,7 +146,10 @@ namespace MatchZy
 
         private void SendUnreadyPlayersMessage()
         {
-            if (!isWarmup || matchStarted) return;
+            // ⚠️ CHỈ return khi KHÔNG phải warmup phase
+            // HOẶC khi đang trong live match (không phải waiting for team names)
+            if (!isWarmup || (matchStarted && !isWaitingForTeamNames)) return;
+
             List<string> unreadyPlayers = new();
 
             foreach (var key in playerReadyStatus.Keys)
@@ -159,9 +162,8 @@ namespace MatchZy
             if (unreadyPlayers.Count > 0)
             {
                 string unreadyPlayerList = string.Join(", ", unreadyPlayers);
-                string minimumReadyRequiredMessage = isMatchSetup ? "" : $"[Minimum ready players required: {ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}]";
+                string minimumReadyRequiredMessage = isMatchSetup ? "" : $"[Số người chơi tối thiểu cần sẵn sàng: {ChatColors.Gold}{minimumReadyRequired}{ChatColors.Silver}]";
 
-                // Server.PrintToChatAll($"{chatPrefix} Unready players: {unreadyPlayerList}. Please type .ready to ready up! {minimumReadyRequiredMessage}");
                 if (isRoundRestorePending)
                 {
                     PrintToAllChat(Localizer["matchzy.ready.readytotestorebackupinfomessage", unreadyPlayerList, minimumReadyRequiredMessage]);
@@ -176,12 +178,10 @@ namespace MatchZy
                 int countOfReadyPlayers = playerReadyStatus.Count(kv => kv.Value == true);
                 if (isMatchSetup)
                 {
-                    // Server.PrintToChatAll($"{chatPrefix} Current ready players: {ChatColors.Green}{countOfReadyPlayers}{ChatColors.Default}");
                     PrintToAllChat(Localizer["matchzy.utility.readyplayers", countOfReadyPlayers]);
                 }
                 else
                 {
-                    // Server.PrintToChatAll($"{chatPrefix} Minimum ready players required {ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}, current ready players: {ChatColors.Green}{countOfReadyPlayers}{ChatColors.Default}");
                     PrintToAllChat(Localizer["matchzy.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers]);
                 }
             }
@@ -240,8 +240,23 @@ namespace MatchZy
             ExecWarmupCfg();
         }
 
+        // ✅ FIX 5: StartKnifeRound - Thêm protection
         private void StartKnifeRound()
         {
+            // Tránh gọi knife round nhiều lần
+            if (isKnifeRound)
+            {
+                Log("[StartKnifeRound] Knife round already started, ignoring duplicate call");
+                return;
+            }
+
+            // ✅ Kiểm tra xem có đang trong warmup không
+            if (!isWarmup && matchStarted)
+            {
+                Log("[StartKnifeRound] Match already in progress, cannot start knife round");
+                return;
+            }
+
             // Kills unready players message timer
             if (unreadyPlayerMessageTimer != null)
             {
@@ -254,6 +269,7 @@ namespace MatchZy
             isKnifeRound = true;
             readyAvailable = false;
             isWarmup = false;
+            isMatchLive = false;
 
             var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg", knifeCfgPath);
 
@@ -269,9 +285,9 @@ namespace MatchZy
                 Server.ExecuteCommand("mp_ct_default_secondary \"\";mp_free_armor 1;mp_freezetime 10;mp_give_player_c4 0;mp_maxmoney 0;mp_respawn_immunitytime 0;mp_respawn_on_death_ct 0;mp_respawn_on_death_t 0;mp_roundtime 1.92;mp_roundtime_defuse 1.92;mp_roundtime_hostage 1.92;mp_t_default_secondary \"\";mp_round_restart_delay 3;mp_team_intro_time 0;mp_restartgame 1;mp_warmup_end;");
             }
 
-            PrintToAllChat($"{ChatColors.Olive}1!");
-            PrintToAllChat($"{ChatColors.Lime}2!");
-            PrintToAllChat($"{ChatColors.Green}36!");
+            PrintToAllChat($"{ChatColors.Olive}MỘT TÁM!");
+            PrintToAllChat($"{ChatColors.Lime}MƯỜI HAI!");
+            PrintToAllChat($"{ChatColors.Green}BA SÁU");
         }
 
         private void SendSideSelectionMessage()
@@ -283,12 +299,22 @@ namespace MatchZy
 
         private void StartAfterKnifeWarmup()
         {
+            // ✅ Kiểm tra xem có đang trong knife round không
+            if (!isKnifeRound)
+            {
+                Log("[StartAfterKnifeWarmup] Not in knife round, ignoring call");
+                return;
+            }
+
             isWarmup = true;
+            isSideSelectionPhase = true;
+            isMatchLive = false; // ✅ TẮT LIVE MODE - KHÔNG TÍNH ĐIỂM
+            isKnifeRound = false; // ✅ Tắt knife round flag
+
             ExecWarmupCfg();
             knifeWinnerName = knifeWinner == 3 ? reverseTeamSides["CT"].teamName : reverseTeamSides["TERRORIST"].teamName;
             ShowDamageInfo();
             PrintToAllChat(Localizer["matchzy.knife.sidedecisionpending", knifeWinnerName]);
-            // Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{knifeWinnerName}{ChatColors.Default} Won the knife. Waiting for them to type {ChatColors.Green}.stay{ChatColors.Default} or {ChatColors.Green}.switch{ChatColors.Default}");
             sideSelectionMessageTimer ??= AddTimer(chatTimerDelay, SendSideSelectionMessage, TimerFlags.REPEAT);
         }
 
@@ -377,12 +403,29 @@ namespace MatchZy
         {
             try
             {
+                Log($"[ResetMatch] Starting reset. matchStarted: {matchStarted}, isKnifeRound: {isKnifeRound}, isSideSelectionPhase: {isSideSelectionPhase}");
+
+                // ✅ Kiểm tra xem có đang trong các phase quan trọng không
+                if (isKnifeRound && !isSideSelectionPhase)
+                {
+                    Log("[ResetMatch] Currently in knife round (not side selection), blocking reset");
+                    return;
+                }
+
                 // We stop demo recording if a live match was restarted
                 if (matchStarted && isDemoRecording)
                 {
                     Server.ExecuteCommand($"tv_stoprecord");
                     isDemoRecording = false;
                 }
+
+                // ✅ Reset ALL flags trước
+                isCheckingLiveRequired = false;
+                isHandlingKnifeWinner = false;
+                isWaitingForTeamNames = false;
+                isTeam1NameSet = false;
+                isTeam2NameSet = false;
+
                 // Reset match data
                 matchStarted = false;
                 readyAvailable = true;
@@ -412,21 +455,21 @@ namespace MatchZy
                 }
 
                 teamReadyOverride = new()
-                {
-                    {CsTeam.Terrorist, false},
-                    {CsTeam.CounterTerrorist, false},
-                    {CsTeam.Spectator, false}
-                };
+        {
+            {CsTeam.Terrorist, false},
+            {CsTeam.CounterTerrorist, false},
+            {CsTeam.Spectator, false}
+        };
 
                 HandleClanTags();
 
                 // Reset unpause data
                 Dictionary<string, object> unpauseData = new()
-                {
-                    { "ct", false },
-                    { "t", false },
-                    { "pauseTeam", "" }
-                };
+        {
+            { "ct", false },
+            { "t", false },
+            { "pauseTeam", "" }
+        };
 
                 // Reset stop data
                 stopData["ct"] = false;
@@ -480,6 +523,7 @@ namespace MatchZy
 
                 KillPhaseTimers();
                 UpdatePlayersMap();
+
                 if (warmupCfgRequired)
                 {
                     StartWarmup();
@@ -588,21 +632,29 @@ namespace MatchZy
                 knifeWinner = random.Next(2, 4);
             }
         }
+        private bool isHandlingKnifeWinner = false;
 
         private void HandleKnifeWinner(EventCsWinPanelRound @event)
         {
+            // ✅ Tránh xử lý nhiều lần
+            if (isHandlingKnifeWinner)
+            {
+                Log("[HandleKnifeWinner] Already handling knife winner, ignoring duplicate event");
+                return;
+            }
+
+            if (!isKnifeRound)
+            {
+                Log("[HandleKnifeWinner] Not in knife round, ignoring call");
+                return;
+            }
+
+            isHandlingKnifeWinner = true;
+
             DetermineKnifeWinner();
-            // Below code is working partially (Winner audio plays correctly for knife winner team, but may display round winner incorrectly)
-            // Hence we restart the game with StartAfterKnifeWarmup and allow the winning team to choose side
 
             @event.FunfactToken = "";
 
-            // Commenting these assignments as they were crashing the server.
-            // long empty = 0;
-            // @event.FunfactPlayer = null;
-            // @event.FunfactData1 = empty;
-            // @event.FunfactData2 = empty;
-            // @event.FunfactData3 = empty;
             int finalEvent = 10;
             if (knifeWinner == 3)
             {
@@ -614,6 +666,12 @@ namespace MatchZy
             }
             Log($"[KNIFE WINNER] Won by: {knifeWinner}, finalEvent: {@event.FinalEvent}, newFinalEvent: {finalEvent}");
             @event.FinalEvent = finalEvent;
+
+            // ✅ Reset flag sau một khoảng thời gian ngắn
+            AddTimer(0.5f, () =>
+            {
+                isHandlingKnifeWinner = false;
+            });
         }
 
         private void HandleMapChangeCommand(CCSPlayerController? player, string mapName)
@@ -684,13 +742,21 @@ namespace MatchZy
             }
         }
 
+        private bool isCheckingLiveRequired = false;
         private void CheckLiveRequired()
         {
-            if (!readyAvailable || matchStarted) return;
+            if (!readyAvailable || (matchStarted && !isWaitingForTeamNames)) return;
 
-            // Todo: Implement a same ready system for both pug and match
+            // ✅ Tránh gọi đồng thời
+            if (isCheckingLiveRequired)
+            {
+                Log("[CheckLiveRequired] Already checking, ignoring duplicate call");
+                return;
+            }
+
             int countOfReadyPlayers = playerReadyStatus.Count(kv => kv.Value == true);
             bool liveRequired = false;
+
             if (isMatchSetup)
             {
                 if (IsTeamsReady() && IsSpectatorsReady())
@@ -709,9 +775,19 @@ namespace MatchZy
             {
                 liveRequired = true;
             }
+
             if (liveRequired)
             {
-                HandleMatchStart();
+                isCheckingLiveRequired = true;
+                try
+                {
+                    HandleMatchStart();
+                }
+                finally
+                {
+                    // ✅ Đảm bảo flag được reset ngay cả khi có exception
+                    isCheckingLiveRequired = false;
+                }
             }
         }
 
@@ -722,6 +798,7 @@ namespace MatchZy
         private bool isWaitingForTeamNames = false;
         private Timer? teamNameReminderTimer;
 
+        // ✅ FIX 3: HandleMatchStart - Fix logic chính
         private void HandleMatchStart()
         {
             isPractice = false;
@@ -735,11 +812,19 @@ namespace MatchZy
                 return;
             }
 
+            // ✅ Kiểm tra xem match đã started chưa TRƯỚC KHI set flag
+            if (matchStarted && !isWaitingForTeamNames)
+            {
+                Log("[HandleMatchStart] Match already started, ignoring duplicate call");
+                return;
+            }
+
+            // ✅ Kiểm tra tên đội TRƯỚC KHI set matchStarted = true
             if (matchzyTeam1.teamName == "COUNTER-TERRORISTS" || matchzyTeam2.teamName == "TERRORISTS")
             {
                 if (!isWaitingForTeamNames)
                 {
-                    matchStarted = true;
+                    // ⚠️ KHÔNG set matchStarted = true ở đây
                     isWaitingForTeamNames = true;
                     isTeam1NameSet = matchzyTeam1.teamName != "COUNTER-TERRORISTS";
                     isTeam2NameSet = matchzyTeam2.teamName != "TERRORISTS";
@@ -758,9 +843,11 @@ namespace MatchZy
 
                     StartTeamNameReminder();
                 }
-                return;
+                return; // Return sớm mà KHÔNG set matchStarted
             }
 
+            // ✅ Chỉ set matchStarted = true KHI thực sự bắt đầu match
+            matchStarted = true;
             isWaitingForTeamNames = false;
             StopTeamNameReminder();
 
@@ -813,7 +900,6 @@ namespace MatchZy
                 }
             }
         }
-
         private void StartTeamNameReminder()
         {
             StopTeamNameReminder();
@@ -845,6 +931,7 @@ namespace MatchZy
             }
         }
 
+        // ✅ FIX 4: SetTeamName - Cải thiện logic
         public void SetTeamName(CCSPlayerController player, string teamName)
         {
             if (string.IsNullOrWhiteSpace(teamName))
@@ -896,7 +983,11 @@ namespace MatchZy
                 PrintToAllChat(Localizer["matchzy.teams.bothnames.set"]);
                 StopTeamNameReminder();
 
-                HandleMatchStart();
+                // ✅ Chỉ gọi HandleMatchStart nếu đang waiting hoặc chưa started
+                if (!matchStarted || isWaitingForTeamNames)
+                {
+                    HandleMatchStart();
+                }
             }
             else
             {

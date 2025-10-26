@@ -18,7 +18,7 @@ namespace MatchZy
 {
     public class Database
     {
-        private IDbConnection connection;
+        private IDbConnection? connection;
 
         DatabaseConfig? config;
         public DatabaseType databaseType { get; set; }
@@ -28,7 +28,7 @@ namespace MatchZy
             ConnectDatabase(directory);
             try
             {
-                connection.Open();
+                connection!.Open();
                 string dbType = (connection is SqliteConnection) ? "SQLite" : "MySQL";
                 Log($"[InitializeDatabase] {dbType} Database connection successful");
 
@@ -82,7 +82,7 @@ namespace MatchZy
 
         public void CreateRequiredTablesSQLite()
         {
-            connection.Execute($@"
+            connection!.Execute($@"
             CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
                 matchid INTEGER PRIMARY KEY AUTOINCREMENT,
                 start_time DATETIME NOT NULL,
@@ -96,7 +96,7 @@ namespace MatchZy
                 server_ip TEXT NOT NULL DEFAULT '0'
             )");
 
-            connection.Execute(@"
+            connection!.Execute(@"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_maps (
                     matchid INTEGER NOT NULL,
                     mapnumber INTEGER NOT NULL,
@@ -110,7 +110,7 @@ namespace MatchZy
                     FOREIGN KEY (matchid) REFERENCES matchzy_stats_matches (matchid)
                 )");
 
-            connection.Execute(@"
+            connection!.Execute(@"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_players (
                     matchid INTEGER NOT NULL,
                     mapnumber INTEGER NOT NULL,
@@ -156,7 +156,7 @@ namespace MatchZy
 
         public void CreateRequiredTablesSQL()
         {
-            connection.Execute($@"
+            connection!.Execute($@"
                 CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
                     matchid INT PRIMARY KEY AUTO_INCREMENT,
                     start_time DATETIME NOT NULL,
@@ -170,7 +170,7 @@ namespace MatchZy
                     server_ip VARCHAR(255) NOT NULL DEFAULT '0'
                 )");
                 
-            connection.Execute($@"
+            connection!.Execute($@"
             CREATE TABLE IF NOT EXISTS matchzy_stats_maps (
                 matchid INT NOT NULL,
                 mapnumber TINYINT(3) UNSIGNED NOT NULL,
@@ -185,7 +185,7 @@ namespace MatchZy
                 CONSTRAINT matchzy_stats_maps_matchid FOREIGN KEY (matchid) REFERENCES matchzy_stats_matches (matchid)
             )");
 
-            connection.Execute($@"
+            connection!.Execute($@"
             CREATE TABLE IF NOT EXISTS matchzy_stats_players (
                 matchid INT NOT NULL,
                 mapnumber TINYINT(3) UNSIGNED NOT NULL,
@@ -238,12 +238,12 @@ namespace MatchZy
 
                 if (mapNumber == 0) {
                     if (isMatchSetup && liveMatchId != -1) {
-                        connection.Execute(@"
+                        connection!.Execute(@"
                             INSERT INTO matchzy_stats_matches (matchid, start_time, team1_name, team2_name, series_type, server_ip)
                             VALUES (@liveMatchId, " + dateTimeExpression + ", @team1name, @team2name, @seriesType, @serverIp)",
                             new { liveMatchId, team1name, team2name, seriesType, serverIp });
                     } else {
-                        connection.Execute(@"
+                        connection!.Execute(@"
                             INSERT INTO matchzy_stats_matches (start_time, team1_name, team2_name, series_type, server_ip)
                             VALUES (" + dateTimeExpression + ", @team1name, @team2name, @seriesType, @serverIp)",
                             new { team1name, team2name, seriesType, serverIp });
@@ -251,7 +251,7 @@ namespace MatchZy
                 }
 
                 if (isMatchSetup && liveMatchId != -1) {
-                    connection.Execute(@"
+                    connection!.Execute(@"
                         INSERT INTO matchzy_stats_maps (matchid, start_time, mapnumber, mapname)
                         VALUES (@liveMatchId, " + dateTimeExpression + ", @mapNumber, @mapName)",
                         new { liveMatchId, mapNumber, mapName });
@@ -262,14 +262,14 @@ namespace MatchZy
                 long matchId = -1;
                 if (connection is SqliteConnection)
                 {
-                    matchId = connection.ExecuteScalar<long>("SELECT last_insert_rowid()");
+                    matchId = connection!.ExecuteScalar<long>("SELECT last_insert_rowid()");
                 }
                 else if (connection is MySqlConnection)
                 {
-                    matchId = connection.ExecuteScalar<long>("SELECT LAST_INSERT_ID()");
+                    matchId = connection!.ExecuteScalar<long>("SELECT LAST_INSERT_ID()");
                 }
 
-                connection.Execute(@"
+                connection!.Execute(@"
                     INSERT INTO matchzy_stats_maps (matchid, start_time, mapnumber, mapname)
                     VALUES (@matchId, " + dateTimeExpression + ", @mapNumber, @mapName)",
                     new { matchId, mapNumber, mapName });
@@ -287,7 +287,7 @@ namespace MatchZy
         public void UpdateTeamData(int matchId, string team1name, string team2name) {
             try
             {
-                connection.Execute(@"
+                connection!.Execute(@"
                     UPDATE matchzy_stats_matches
                     SET team1_name = @team1name, team2_name = @team2name
                     WHERE matchid = @matchId",
@@ -312,14 +312,14 @@ namespace MatchZy
                     SET winner = @winnerName, end_time = {dateTimeExpression}, team1_score = @t1score, team2_score = @t2score
                     WHERE matchid = @matchId AND mapNumber = @mapNumber";
 
-                await connection.ExecuteAsync(sqlQuery, new { matchId, winnerName, t1score, t2score, mapNumber });
+                await connection!.ExecuteAsync(sqlQuery, new { matchId, winnerName, t1score, t2score, mapNumber });
 
                 sqlQuery = $@"
                     UPDATE matchzy_stats_matches
                     SET team1_score = @team1SeriesScore, team2_score = @team2SeriesScore
                     WHERE matchid = @matchId";
 
-                await connection.ExecuteAsync(sqlQuery, new { matchId, team1SeriesScore, team2SeriesScore });
+                await connection!.ExecuteAsync(sqlQuery, new { matchId, team1SeriesScore, team2SeriesScore });
 
                 Log($"[SetMapEndData] Data updated for matchId: {matchId} mapNumber: {mapNumber} winnerName: {winnerName}");
             }
@@ -340,7 +340,7 @@ namespace MatchZy
                     SET winner = @winnerName, end_time = {dateTimeExpression}, team1_score = @t1score, team2_score = @t2score
                     WHERE matchid = @matchId";
 
-                await connection.ExecuteAsync(sqlQuery, new { matchId, winnerName, t1score, t2score });
+                await connection!.ExecuteAsync(sqlQuery, new { matchId, winnerName, t1score, t2score });
 
                 Log($"[SetMatchEndData] Data updated for matchId: {matchId} winnerName: {winnerName}");
             }
@@ -359,7 +359,7 @@ namespace MatchZy
                     SET team1_score = @t1score, team2_score = @t2score
                     WHERE matchid = @matchId AND mapnumber = @mapNumber";
 
-                await connection.ExecuteAsync(sqlQuery, new { matchId, mapNumber, t1score, t2score });
+                await connection!.ExecuteAsync(sqlQuery, new { matchId, mapNumber, t1score, t2score });
             }
             catch (Exception ex)
             {
@@ -429,7 +429,7 @@ namespace MatchZy
                             @head_shot_kills, @cash_earned, @enemies_flashed)";
                     }
 
-                    await connection.ExecuteAsync(sqlQuery,
+                    await connection!.ExecuteAsync(sqlQuery,
                         new
                         {
                             matchId,
@@ -495,7 +495,7 @@ namespace MatchZy
                 using (var writer = new StreamWriter(csvFilePath))
                 using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
                 {
-                    IEnumerable<dynamic> playerStatsData = await connection.QueryAsync(
+                    IEnumerable<dynamic> playerStatsData = await connection!.QueryAsync(
                         "SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
 
                     // Use the first data row to get the column names
